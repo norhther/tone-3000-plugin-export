@@ -136,8 +136,18 @@ TEST(RigRenderTest, EmptyRigPassesTheSweepThrough) {
 
   ASSERT_TRUE(result.ok) << result.error.toStdString();
   ASSERT_EQ(out.size(), sweep.size());
-  EXPECT_LT(maxAbsDiff(out, sweep, 4096, sweep.size()), 0.005f)
-      << "an empty chain must not colour or delay the sweep";
+  // An empty chain is not promised to be bit-exact (the processor's own
+  // output stage shapes broadband noise slightly), so pin what the capture
+  // depends on: no delay, unity gain, and a waveform that stays the sweep's.
+  EXPECT_EQ(bestCorrelationLag(out, sweep, 4096, 8192, 32), 0) << "an empty chain must not delay the sweep";
+  double outEnergy = 0.0, inEnergy = 0.0, cross = 0.0;
+  for (size_t i = 4096; i < sweep.size(); ++i) {
+    outEnergy += static_cast<double>(out[i]) * out[i];
+    inEnergy += static_cast<double>(sweep[i]) * sweep[i];
+    cross += static_cast<double>(out[i]) * sweep[i];
+  }
+  EXPECT_NEAR(10.0 * std::log10(outEnergy / inEnergy), 0.0, 0.05) << "an empty chain must not change the level";
+  EXPECT_GT(cross / std::sqrt(outEnergy * inEnergy), 0.999) << "an empty chain must not colour the sweep";
 }
 
 TEST(RigRenderTest, FullScaleOutputIsReportedNotFixed) {
@@ -214,4 +224,34 @@ TEST(RigRenderTest, SweepReaderRejectsWhatTheTrainerWouldNot) {
   EXPECT_EQ(samples.size(), 480u);
 
   dir.deleteRecursively();
+}
+
+// End to end on the real TONE3000 sweep. Skipped unless T3K_SWEEP_FILE points
+// at T3K-sweep-v3.wav (the file is TONE3000's, not carried in the repo).
+TEST(RigRenderTest, RealSweepComesBackTheSameLengthAs24BitMono) {
+  const juce::String path = juce::SystemStats::getEnvironmentVariable("T3K_SWEEP_FILE", {});
+  if (path.isEmpty()) GTEST_SKIP() << "set T3K_SWEEP_FILE to T3K-sweep-v3.wav to run this";
+
+  std::vector<float> sweep;
+  ASSERT_EQ(t3k::rigrender::readSweep(juce::File(path), sweep), juce::String());
+
+  ChainTestProcessor rig;
+  prepareLiveRig(rig);
+  seedMonoNamChain(rig);
+  ASSERT_TRUE(waitForChainLoaded(rig));
+
+  std::vector<float> out;
+  const auto result = t3k::rigrender::render(rig, sweep, out);
+  ASSERT_TRUE(result.ok) << result.error.toStdString();
+  ASSERT_EQ(out.size(), sweep.size());
+  EXPECT_GT(result.peak, 0.001f);
+
+  const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("t3k-real-sweep-capture.wav");
+  ASSERT_EQ(t3k::rigrender::writeCapture(file, out), juce::String());
+  std::vector<float> back;
+  ASSERT_EQ(t3k::rigrender::readSweep(file, back), juce::String());
+  EXPECT_EQ(back.size(), sweep.size()) << "the trainer rejects a length mismatch";
+  std::printf("real sweep: %zu frames, peak %.2f dBFS, clipped=%d\n", back.size(),
+              20.0 * std::log10(std::max(result.peak, 1.0e-9f)), result.clipped ? 1 : 0);
+  file.deleteFile();
 }

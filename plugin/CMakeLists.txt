@@ -330,6 +330,8 @@ target_sources(${PROJECT_NAME}
         src/StereoOffset.cpp
         include/AutoOffset.h
         src/AutoOffset.cpp
+        include/RigRender.h
+        src/RigRender.cpp
         include/LegacyParamIds.h
         src/LegacyParamIds.cpp
         include/PresetFile.h

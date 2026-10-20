@@ -1,6 +1,6 @@
 #include "ChainBake.h"
 
-#include <nlohmann/json.hpp>
+#include "json.hpp"
 #include <regex>
 
 #include "NAM/get_dsp.h"

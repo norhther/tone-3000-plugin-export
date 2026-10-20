@@ -10,6 +10,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -126,6 +127,26 @@ public:
   virtual void startAutoOffset() = 0;
   virtual void cancelAutoOffset() = 0;
   virtual juce::var pollAutoOffset() = 0;
+
+  // Chain bake: render the chain to a single .nam (see ChainBake.h). Optional:
+  // a backend with no audio engine (the testbed's mock) reports it can't.
+  struct BakeStatus {
+    enum class Phase { running, done, failed, cancelled };
+    Phase phase = Phase::running;
+    float fraction = 0.0f;  // 0..1 overall
+    juce::String message;   // progress line, or the failure
+    // With Phase::done: the trainer's validation ESR and the plugin's own
+    // check of the saved file against the rendered chain (-1 = unknown).
+    double trainerEsr = -1.0, nativeEsr = -1.0;
+    juce::File output;
+  };
+  virtual bool canBakeChain() { return false; }
+  // Start a bake; `onStatus` runs on the message thread. Returns a
+  // user-facing error when it can't start (no trainer, already running).
+  virtual juce::String startChainBake(const juce::File&, std::function<void(const BakeStatus&)>) {
+    return "Not available in this build.";
+  }
+  virtual void cancelChainBake() {}
 
   // Misc
   virtual juce::String pluginVersion() = 0;

@@ -7,6 +7,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "Backend.h"
+#include "ChainBake.h"
 #include "Processor.h"
 #include "StandaloneAudioSettings.h"
 
@@ -106,6 +107,10 @@ public:
   juce::String uniqueDeviceId() override;
   void setAccessToken(const juce::String& token) override;
   void copyToClipboard(const juce::String& text) override;
+  bool canBakeChain() override { return true; }
+  juce::String startChainBake(const juce::File& destination,
+                              std::function<void(const BakeStatus&)> onStatus) override;
+  void cancelChainBake() override;
   bool copyLogs() override;
   juce::String revealLogs() override;
   bool canOpenPresetsFolder() override;
@@ -122,6 +127,7 @@ private:
   }
 
   TONE3000Processor& processor_;
+  t3k::bake::ChainBake chainBake_;
   juce::Component& peerHost_;
   std::unique_ptr<StandaloneAudioSettings> audioSettings_;
 };

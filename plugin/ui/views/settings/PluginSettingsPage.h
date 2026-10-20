@@ -3,7 +3,8 @@
 // (which of the two the faceplate shows), NAM A2 size default, the per-block
 // size / normalization controls, calibration (with its dBu field),
 // oversampling (with its rate), multi-core, MIDI Mapping, Presets (open the
-// user presets folder), diagnostics, and the version / update footer.
+// user presets folder), Bake Chain (render the chain to one .nam), diagnostics,
+// and the version / update footer.
 #pragma once
 
 #include <memory>
@@ -42,6 +43,10 @@ private:
   void rememberMachineDefault(const ParamBinding& param);
   void setAndRemember(ParamBinding& param, float normalised);
   void showLogStatus(const juce::String& status);
+  void pickBakeDestination();
+  void startBake(const juce::File& destination);
+  void bakeStatusChanged(const Backend::BakeStatus& status);
+  void syncBake(bool baking);
 
   Services& services_;
 
@@ -73,6 +78,16 @@ private:
   FieldRow presets_;
   FormButton openPresets_;
   FormBox openPresetsBox_;
+
+  FieldRow bake_;
+  FormButton bakeButton_, bakeCancel_;
+  FormBox bakeButtonBox_, bakeCancelBox_;
+  Paragraph bakeStatus_;
+  std::unique_ptr<juce::FileChooser> bakeChooser_;
+  bool baking_ = false;
+  // Progress callbacks outlive this page (the bake belongs to the editor's
+  // backend); they check this before touching it.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 
   FieldRow diagnostics_;
   FormButton copyLogs_, revealLogs_;

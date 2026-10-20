@@ -135,6 +135,15 @@ PluginSettingsPage::PluginSettingsPage(Services& services)
                "Your saved presets are files in a folder you can back up, share, or copy to another computer."),
       openPresets_("Open presets folder", FormButton::text(form::kBodyPx, false, theme::kLinkBlue)),
       openPresetsBox_(openPresets_, static_cast<float>(openPresets_.preferredHeight())),
+      bake_("Bake Chain to .nam",
+            "Render your whole chain, with its current settings, into a single NAM capture you can load on "
+            "hardware or in hosts that take one model. Needs Python with the NAM trainer "
+            "(pip install neural-amp-modeler); a GPU makes it far faster."),
+      bakeButton_("Render chain to .nam…", FormButton::cta()),
+      bakeCancel_("Cancel", FormButton::text(form::kBodyPx, false, theme::kLinkBlue)),
+      bakeButtonBox_(bakeButton_, static_cast<float>(bakeButton_.preferredHeight())),
+      bakeCancelBox_(bakeCancel_, static_cast<float>(bakeCancel_.preferredHeight())),
+      bakeStatus_(juce::String(), form::kSmallPx),
       diagnostics_("Diagnostics", "Copy recent diagnostic logs to the clipboard and paste them into a bug report."),
       copyLogs_("Copy Logs", FormButton::cta()),
       revealLogs_("Reveal log file on disk", FormButton::text(form::kBodyPx, false, theme::kLinkBlue)),
@@ -210,6 +219,20 @@ PluginSettingsPage::PluginSettingsPage(Services& services)
     add(presets_);
   }
 
+  // Bake chain: hidden where the backend has no engine to render with.
+  if (services_.backend.canBakeChain()) {
+    bake_.setInlineLabel();
+    bake_.content().setGap(form::kControlGap);
+    bake_.content().add(bakeButtonBox_);
+    bake_.content().add(bakeCancelBox_);
+    bake_.content().add(bakeStatus_);
+    bakeButton_.onClick = [this] { pickBakeDestination(); };
+    bakeCancel_.onClick = [this] { services_.backend.cancelChainBake(); };
+    syncBake(false);
+    bake_.content().setShown(bakeStatus_, false);
+    add(bake_);
+  }
+
   // Diagnostics.
   diagnostics_.setInlineLabel();
   diagnostics_.content().setGap(form::kControlGap);
@@ -245,6 +268,7 @@ PluginSettingsPage::PluginSettingsPage(Services& services)
 }
 
 PluginSettingsPage::~PluginSettingsPage() {
+  *alive_ = false;
   services_.updates.removeListener(this);
   services_.chain.removeListener(this);
   services_.prefs.removeListener(this);
@@ -312,6 +336,74 @@ void PluginSettingsPage::syncFooter() {
   setShown(footer_, footer);
   // Every section carries SECTION_GAP below it; only the footer doesn't.
   setTrailing(footer ? 0 : form::kSectionGap);
+}
+
+void PluginSettingsPage::syncBake(bool baking) {
+  baking_ = baking;
+  bake_.content().setShown(bakeButtonBox_, !baking);
+  bake_.content().setShown(bakeCancelBox_, baking);
+}
+
+void PluginSettingsPage::pickBakeDestination() {
+  if (baking_ || bakeChooser_ != nullptr) return;
+  const auto& preset = services_.chain.state().preset;
+  const juce::String base = preset ? preset->name : juce::String("chain");
+  const auto start = juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                         .getChildFile(juce::File::createLegalFileName(base) + "_combined.nam");
+  bakeChooser_ = std::make_unique<juce::FileChooser>("Save baked chain", start, "*.nam");
+  std::weak_ptr<bool> alive = alive_;
+  bakeChooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                                juce::FileBrowserComponent::warnAboutOverwriting,
+                            [this, alive](const juce::FileChooser& chooser) {
+                              auto live = alive.lock();
+                              if (!live || !*live) return;
+                              auto picked = chooser.getResult();
+                              bakeChooser_.reset();
+                              if (picked == juce::File()) return;
+                              startBake(picked.withFileExtension("nam"));
+                            });
+}
+
+void PluginSettingsPage::startBake(const juce::File& destination) {
+  std::weak_ptr<bool> alive = alive_;
+  auto* services = &services_;
+  const auto error = services_.backend.startChainBake(
+      destination, [this, alive, services](const Backend::BakeStatus& status) {
+        using Phase = Backend::BakeStatus::Phase;
+        if (status.phase != Phase::running) {
+          juce::String text = status.message;
+          if (status.phase == Phase::done) {
+            text = "Saved " + status.output.getFileName();
+            if (status.nativeEsr >= 0) text += "  (ESR " + juce::String(status.nativeEsr, 4) + ")";
+          }
+          services->toast.show(text);
+        }
+        if (auto live = alive.lock(); live && *live) bakeStatusChanged(status);
+      });
+  if (error.isNotEmpty()) {
+    services_.toast.show(error);
+    return;
+  }
+  syncBake(true);
+  bakeStatus_.setText("Starting…");
+  bake_.content().setShown(bakeStatus_, true);
+}
+
+void PluginSettingsPage::bakeStatusChanged(const Backend::BakeStatus& status) {
+  using Phase = Backend::BakeStatus::Phase;
+  if (status.phase == Phase::running) {
+    bakeStatus_.setText(juce::String(juce::roundToInt(status.fraction * 100.0f)) + "%  " + status.message);
+    return;
+  }
+  syncBake(false);
+  if (status.phase == Phase::done) {
+    juce::String text = "Saved " + status.output.getFullPathName() + ".";
+    if (status.nativeEsr >= 0)
+      text += " Accuracy (ESR vs. your chain): " + juce::String(status.nativeEsr, 4) + " (lower is better).";
+    bakeStatus_.setText(text);
+  } else {
+    bakeStatus_.setText(status.message);
+  }
 }
 
 void PluginSettingsPage::showLogStatus(const juce::String& status) {

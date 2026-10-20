@@ -321,6 +321,8 @@ target_sources(${PROJECT_NAME}
         src/BlockEq.cpp
         include/BlockSpectrum.h
         src/BlockSpectrum.cpp
+        include/ChainBake.h
+        src/ChainBake.cpp
         include/ChainBlock.h
         include/ChainHistory.h
         include/ImageDeck.h

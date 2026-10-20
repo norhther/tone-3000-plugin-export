@@ -18,6 +18,7 @@ juce_add_console_app(DspTests PRODUCT_NAME "DspTests")
 target_sources(DspTests PRIVATE
     src/auto_offset_tests.cpp
     src/branch_tests.cpp
+    src/chain_bake_tests.cpp
     src/clipboard_tests.cpp
     src/dsp_tests.cpp
     src/dual_mono_tests.cpp
@@ -50,6 +51,7 @@ target_sources(DspTests PRIVATE
     ../plugin/src/AutoOffset.cpp
     ../plugin/src/BlockEq.cpp
     ../plugin/src/BlockSpectrum.cpp
+    ../plugin/src/ChainBake.cpp
     ../plugin/src/LegacyParamIds.cpp
     ../plugin/src/MidiMapper.cpp
     ../plugin/src/NamEngine.cpp

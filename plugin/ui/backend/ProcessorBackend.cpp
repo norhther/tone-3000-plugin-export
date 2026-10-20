@@ -242,6 +242,30 @@ void ProcessorBackend::copyToClipboard(const juce::String& text) {
   juce::SystemClipboard::copyTextToClipboard(text);
 }
 
+juce::String ProcessorBackend::startChainBake(const juce::File& destination,
+                                              std::function<void(const BakeStatus&)> onStatus) {
+  using Phase = t3k::bake::Progress::Phase;
+  t3k::bake::ChainBake::Settings settings;
+  settings.destination = destination;
+  return chainBake_.start(processor_, std::move(settings), [onStatus](const t3k::bake::Progress& p) {
+    BakeStatus s;
+    s.fraction = p.fraction;
+    s.message = p.message;
+    s.trainerEsr = p.trainerEsr;
+    s.nativeEsr = p.nativeEsr;
+    s.output = p.output;
+    switch (p.phase) {
+      case Phase::done: s.phase = BakeStatus::Phase::done; break;
+      case Phase::failed: s.phase = BakeStatus::Phase::failed; break;
+      case Phase::cancelled: s.phase = BakeStatus::Phase::cancelled; break;
+      default: s.phase = BakeStatus::Phase::running; break;
+    }
+    if (onStatus) onStatus(s);
+  });
+}
+
+void ProcessorBackend::cancelChainBake() { chainBake_.cancel(); }
+
 bool ProcessorBackend::copyLogs() {
   const juce::File logFile = TONE3000Processor::getLogFile();
   if (!logFile.existsAsFile()) return false;

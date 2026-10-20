@@ -90,6 +90,8 @@ Source: "{#AaxBundle}\*"; DestDir: "{commoncf64}\Avid\Audio\Plug-Ins\TONE3000.aa
 Source: "{#ArtefactsDir}\CLAP\TONE3000.clap"; DestDir: "{commoncf64}\CLAP"; Components: clap; Flags: ignoreversion
 ; Factory presets → ProgramData (all-users; PresetManager scans this as system Factory)
 Source: "..\..\..\resources\factory-presets\*.t3kpreset"; DestDir: "{commonappdata}\TONE3000\Presets\Factory"; Components: presets; Flags: ignoreversion
+; Chain bake training input (the NAM v3 standard input; see plugin/docs/chain-bake.md)
+Source: "..\..\..\resources\training\T3K-sweep-v3.wav"; DestDir: "{commonappdata}\TONE3000\Training"; Components: standalone vst3; Flags: ignoreversion
 
 [InstallDelete]
 ; Installs overlay files and never remove presets dropped from (or renamed

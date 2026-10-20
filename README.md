@@ -25,6 +25,12 @@ install, load tones, and use it.
   undo/redo, and presets. Presets are plain files named after the preset
   (Plugin Settings → Presets opens the folder), so they can be backed up or
   copied between machines.
+- **Bake a chain into one `.nam`.** Plugin Settings → **Bake Chain to .nam**
+  renders your whole chain, with its current settings, through the NAM
+  standard input and trains a single capture from the result, for hardware
+  and hosts that load one model. Needs Python with
+  `pip install neural-amp-modeler`; see
+  [`plugin/docs/chain-bake.md`](plugin/docs/chain-bake.md).
 - **Cross-platform.** One plugin on macOS, Windows, Linux, and iOS
   (Standalone). The UI is JUCE/C++ (`plugin/ui/`), drawn natively on every
   platform: no browser engine, no web runtime, nothing to install beside the

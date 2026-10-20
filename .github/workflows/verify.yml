@@ -8,8 +8,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      - name: Submodules (eigen via GitHub mirror; GitLab is flaky)
+        run: |
+          git config --global url."https://github.com/eigen-mirror/eigen".insteadOf "https://gitlab.com/libeigen/eigen"
+          git submodule update --init --recursive
       - name: Install dependencies
         run: |
           sudo apt-get update
